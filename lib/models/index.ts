@@ -26,3 +26,10 @@ export const Workspace = (models.Workspace as mongoose.Model<any>) || model("Wor
 export const Membership = (models.Membership as mongoose.Model<any>) || model("Membership", membershipSchema)
 export const Board = (models.Board as mongoose.Model<any>) || model("Board", boardSchema)
 export const Favorite = (models.Favorite as mongoose.Model<any>) || model("Favorite", favoriteSchema)
+
+const ytCacheSchema = new Schema(
+  { query: { type: String, required: true, unique: true }, results: { type: Array, default: [] }, expiresAt: { type: Date, required: true } },
+  opts,
+)
+ytCacheSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+export const YtCache = (models.YtCache as mongoose.Model<any>) || model("YtCache", ytCacheSchema)

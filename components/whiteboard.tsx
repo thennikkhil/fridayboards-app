@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { LiveMap, LiveObject } from '@liveblocks/client';
+import { LiveMap, LiveObject, type LsonObject } from '@liveblocks/client';
 import {
   LiveblocksProvider,
   RoomProvider,
@@ -18,7 +18,9 @@ import {
 import getStroke from 'perfect-freehand';
 import { nanoid } from 'nanoid';
 import { renameBoard } from '@/app/actions';
-import type { Layer } from '@/lib/liveblocks-types';
+import type { Layer, WidgetLayer } from '@/lib/liveblocks-types';
+import { WIDGETS, type WSnap, type WidgetData } from './widgets/registry';
+import { WidgetShell } from './widgets/widget-shell';
 import { Icon, type IconName } from './ui-kit';
 
 const tools: { name: IconName; label: string }[] = [
@@ -40,7 +42,7 @@ const HINTS: Record<string, string> = {
   text: 'Click to place text, then just type. Double-click any text, note or shape to edit it.',
   shapes: 'Pick a shape from the little panel, then drag on the canvas. Double-click a shape to write inside it.',
   link: 'Click to drop a sticky note and type straight away. Double-click to edit it later.',
-  image: 'Media widgets are coming next.',
+  image: 'Pick a widget to drop it in the middle of your view. Drag its title bar to move it.',
   music: 'Focus tape is open — toggle it from the Music tool.',
   eraser: 'Drag over anything to erase it.',
 };
@@ -173,7 +175,10 @@ export function Whiteboard(props: Props) {
       <RoomProvider
         id={props.board.id}
         initialPresence={{ cursor: null, pen: null, selection: [] }}
-        initialStorage={{ layers: new LiveMap<string, LiveObject<Layer>>() }}
+        initialStorage={{
+          layers: new LiveMap<string, LiveObject<Layer>>(),
+          widgets: new LiveMap<string, LiveObject<WidgetLayer>>(),
+        }}
       >
         <ClientSideSuspense fallback={<div className="whiteboard" />}>
           <Board {...props} />
@@ -234,6 +239,83 @@ function Board({ board, user, inviteCode }: Props) {
 
   const itemsRef = useRef(items);
   itemsRef.current = items;
+
+  const [focusedWidget, setFocusedWidget] = useState<string | null>(null);
+  const wmap = useStorage((r) => r.widgets) as unknown as
+    | ReadonlyMap<string, Omit<WSnap, 'id'>>
+    | undefined;
+  const widgets: WSnap[] = useMemo(() => {
+    if (!wmap) return [];
+    const entries: [string, Omit<WSnap, 'id'>][] =
+      wmap instanceof Map ? Array.from(wmap.entries()) : Object.entries(wmap as object);
+    return entries.map(([id, w]) => ({ id, ...w })).sort((a, b) => a.z - b.z);
+  }, [wmap]);
+  const insertWidget = useMutation(
+    ({ storage }, id: string, w: Omit<WidgetLayer, 'data'>, data: LsonObject) => {
+      let m = storage.get('widgets');
+      if (!m) {
+        m = new LiveMap<string, LiveObject<WidgetLayer>>();
+        storage.set('widgets', m);
+      }
+      m.set(id, new LiveObject<WidgetLayer>({ ...w, data: new LiveObject(data) }));
+    },
+    [],
+  );
+  const patchWidget = useMutation(
+    ({ storage }, id: string, p: Partial<Omit<WidgetLayer, 'data'>>) => {
+      storage.get('widgets')?.get(id)?.update(p);
+    },
+    [],
+  );
+  const updateWidgetData = useMutation(({ storage }, id: string, p: WidgetData) => {
+    storage.get('widgets')?.get(id)?.get('data').update(p);
+  }, []);
+  const removeWidget = useMutation(({ storage }, id: string) => {
+    storage.get('widgets')?.delete(id);
+  }, []);
+  const gesture = (on: boolean) => (on ? history.pause() : history.resume());
+  const addWidget = (type: string) => {
+    const def = WIDGETS[type];
+    const r = ref.current!.getBoundingClientRect();
+    const x = (r.width / 2 - cam.x) / cam.s - def.defaultSize.w / 2;
+    const y = (r.height / 2 - cam.y) / cam.s - def.defaultSize.h / 2;
+    const id = nanoid();
+    insertWidget(
+      id,
+      {
+        widgetType: type,
+        x,
+        y,
+        w: def.defaultSize.w,
+        h: def.defaultSize.h,
+        title: def.name,
+        isCollapsed: false,
+        isLocked: false,
+        createdBy: user.name,
+        z: Date.now(),
+      },
+      def.initialData(),
+    );
+    setFocusedWidget(id);
+    setTool('cursor');
+  };
+  const duplicateWidget = (w: WSnap) =>
+    insertWidget(
+      nanoid(),
+      {
+        widgetType: w.widgetType,
+        x: w.x + 30,
+        y: w.y + 30,
+        w: w.w,
+        h: w.h,
+        title: w.title,
+        isCollapsed: false,
+        isLocked: false,
+        createdBy: user.name,
+        z: Date.now(),
+      },
+      { ...w.data },
+    );
 
   const insert = useMutation(({ storage }, id: string, l: Layer) => {
     storage.get('layers').set(id, new LiveObject(l));
@@ -587,6 +669,12 @@ function Board({ board, user, inviteCode }: Props) {
             <Icon name={t.name} size={21} />
           </button>
         ))}
+        <button onClick={() => addWidget('counter')} data-tip="Add counter">
+          <Icon name="plus" size={21} />
+        </button>
+        <button onClick={() => addWidget('youtube')} data-tip="Add YouTube">
+          <Icon name="video" size={21} />
+        </button>
         <span className="rail-divider" />
         <button
           onClick={() => pick('eraser')}
@@ -631,6 +719,39 @@ function Board({ board, user, inviteCode }: Props) {
             {mySel.map((id) => outline(id, me.color, id, true))}
           </g>
         </svg>
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            transformOrigin: '0 0',
+            transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.s})`,
+            pointerEvents: 'none',
+          }}
+        >
+          {widgets.map((w) => {
+            const def = WIDGETS[w.widgetType];
+            if (!def) return null;
+            return (
+              <WidgetShell
+                key={w.id}
+                w={w}
+                def={def}
+                scale={cam.s}
+                color={me.color}
+                focused={focusedWidget === w.id}
+                onFocus={() => setFocusedWidget(w.id)}
+                gesture={gesture}
+                patch={(p) => patchWidget(w.id, p)}
+                updateData={(p) => updateWidgetData(w.id, p)}
+                duplicate={() => duplicateWidget(w)}
+                remove={() => removeWidget(w.id)}
+              />
+            );
+          })}
+        </div>
         {others.map(
           (o) =>
             o.presence.cursor && (
@@ -784,6 +905,46 @@ function Board({ board, user, inviteCode }: Props) {
                     </>
                   )}
                 </svg>
+              </button>
+            ))}
+          </div>
+        )}
+        {tool === 'image' && (
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              left: 92,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              padding: 8,
+              background: 'var(--paper)',
+              border: '1.5px solid var(--ink)',
+              borderRadius: 16,
+              boxShadow: '0 8px 20px rgba(0,0,0,.12)',
+            }}
+          >
+            {Object.values(WIDGETS).map((d) => (
+              <button
+                key={d.type}
+                onClick={() => addWidget(d.type)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 12px',
+                  border: 0,
+                  borderRadius: 10,
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  font: '500 14px DM Sans, sans-serif',
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{d.icon}</span> {d.name}
               </button>
             ))}
           </div>
