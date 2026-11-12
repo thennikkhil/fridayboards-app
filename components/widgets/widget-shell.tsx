@@ -86,7 +86,7 @@ export function WidgetShell({ w, def, scale, focused, color, onFocus, gesture, p
       </div>
       {!w.isCollapsed && (
         <div ref={body} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto' }}>
-          <C data={w.data} updateData={updateData} />
+          <C data={w.data} updateData={updateData} widgetId={w.id} scale={scale} isLocked={w.isLocked} />
           {busy && <div style={{ position: 'absolute', inset: 0 }} />}
         </div>
       )}

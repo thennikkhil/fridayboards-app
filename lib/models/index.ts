@@ -26,6 +26,7 @@ export const Workspace = (models.Workspace as mongoose.Model<any>) || model("Wor
 export const Membership = (models.Membership as mongoose.Model<any>) || model("Membership", membershipSchema)
 export const Board = (models.Board as mongoose.Model<any>) || model("Board", boardSchema)
 export const Favorite = (models.Favorite as mongoose.Model<any>) || model("Favorite", favoriteSchema)
+export { FileModel } from "./file"
 
 const ytCacheSchema = new Schema(
   { query: { type: String, required: true, unique: true }, results: { type: Array, default: [] }, expiresAt: { type: Date, required: true } },

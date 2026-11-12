@@ -15,5 +15,11 @@ export default async function BoardPage({ params }: { params: Promise<{ boardId:
   if (!board) notFound()
   if (!(await isMember(user.id, board.workspaceId))) redirect("/dashboard")
   const ws = await Workspace.findById(board.workspaceId).lean<any>()
-  return <Whiteboard board={{ id: boardId, title: board.title }} user={{ name: user.name }} inviteCode={ws.inviteCode} />
+  return (
+    <Whiteboard
+      board={{ id: boardId, title: board.title }}
+      user={{ id: user.id, name: user.name }}
+      inviteCode={ws.inviteCode}
+    />
+  )
 }

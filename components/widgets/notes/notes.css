@@ -1,0 +1,155 @@
+.notes-editor-root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper, #fbfaf5);
+}
+
+.notes-toolbar {
+  z-index: 1;
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--line, #dcd7cc);
+  background: var(--paper, #fbfaf5);
+  padding: 6px;
+}
+
+.notes-toolbar select {
+  max-width: 128px;
+  height: 30px;
+  border: 1px solid var(--line, #dcd7cc);
+  border-radius: 5px;
+  background: var(--paper, #fbfaf5);
+  padding: 0 5px;
+  color: var(--ink, #24231f);
+  font-size: 12px;
+}
+
+.notes-toolbar select:disabled { opacity: 0.55; }
+
+.notes-toolbar-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink, #24231f);
+}
+.notes-toolbar-button svg { width: 16px; height: 16px; }
+.notes-toolbar-button:hover:not(:disabled) { background: #eeeae2; }
+.notes-toolbar-button.is-active { border-color: var(--line, #dcd7cc); background: #eeeae2; }
+.notes-toolbar-button:disabled { cursor: not-allowed; opacity: 0.4; }
+
+.notes-color-control { display: grid; width: 30px; height: 30px; place-items: center; }
+.notes-color-control input {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.notes-color-control input:disabled { cursor: not-allowed; opacity: 0.5; }
+.notes-toolbar-divider { width: 1px; height: 20px; flex: none; background: var(--line, #dcd7cc); }
+
+.notes-editor-content {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.notes-prose {
+  min-height: 100%;
+  padding: 12px 16px 48px;
+  outline: none;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.notes-prose > * + * { margin-top: 0.5rem; }
+.notes-prose h1 { margin-top: 1rem; font-size: 1.6rem; font-weight: 700; }
+.notes-prose h2 { margin-top: 0.9rem; font-size: 1.3rem; font-weight: 650; }
+.notes-prose h3 { margin-top: 0.8rem; font-size: 1.1rem; font-weight: 600; }
+.notes-prose p[style*="text-align: center"],
+.notes-prose h1[style*="text-align: center"],
+.notes-prose h2[style*="text-align: center"],
+.notes-prose h3[style*="text-align: center"] { text-align: center; }
+.notes-prose p[style*="text-align: right"],
+.notes-prose h1[style*="text-align: right"],
+.notes-prose h2[style*="text-align: right"],
+.notes-prose h3[style*="text-align: right"] { text-align: right; }
+.notes-prose p[style*="text-align: justify"],
+.notes-prose h1[style*="text-align: justify"],
+.notes-prose h2[style*="text-align: justify"],
+.notes-prose h3[style*="text-align: justify"] { text-align: justify; }
+.notes-prose ul { list-style: disc; padding-left: 1.4rem; }
+.notes-prose ol { list-style: decimal; padding-left: 1.4rem; }
+.notes-prose blockquote {
+  border-left: 3px solid var(--line, #dcd7cc);
+  padding-left: 0.9rem;
+  color: #615e56;
+}
+.notes-prose pre {
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #eeeae2;
+  padding: 10px 12px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+.notes-prose code {
+  border-radius: 4px;
+  background: #eeeae2;
+  padding: 1px 4px;
+  font-size: 0.88em;
+}
+.notes-prose hr { margin: 1rem 0; border: 0; border-top: 1px solid var(--line, #dcd7cc); }
+.notes-prose mark { border-radius: 2px; background: #fde68a; color: inherit; }
+.notes-prose ul[data-type="taskList"] { list-style: none; padding-left: 0.2rem; }
+.notes-prose ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
+.notes-prose ul[data-type="taskList"] li > label { margin-top: 0.3rem; }
+.notes-prose ul[data-type="taskList"] li[data-checked="true"] > div {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.notes-prose p.is-empty::before,
+.notes-prose .is-editor-empty:first-child::before {
+  float: left;
+  height: 0;
+  color: #77736a;
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.notes-slash-menu {
+  position: absolute;
+  z-index: 50;
+  width: 15rem;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line, #dcd7cc);
+  border-radius: 8px;
+  background: var(--paper, #fbfaf5);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 14%);
+}
+
+.notes-slash-option {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+.notes-slash-option.is-active { background: #eeeae2; }
+.notes-slash-title { font-size: 0.875rem; font-weight: 600; }
+.notes-slash-hint { color: #77736a; font-size: 0.75rem; }

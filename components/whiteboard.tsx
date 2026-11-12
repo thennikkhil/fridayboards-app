@@ -17,8 +17,13 @@ import {
 } from '@liveblocks/react/suspense';
 import getStroke from 'perfect-freehand';
 import { nanoid } from 'nanoid';
+import { NotebookPen, Video } from 'lucide-react';
+import { toast } from 'sonner';
 import { renameBoard } from '@/app/actions';
 import type { Layer, WidgetLayer } from '@/lib/liveblocks-types';
+import { isFromWidgetBody } from '@/lib/utils/widget-events';
+import { AddPdfButton } from './widgets/pdf/add-pdf-button';
+import { useCanvasPdfDrop } from './widgets/pdf/use-canvas-pdf-drop';
 import { WIDGETS, type WSnap, type WidgetData } from './widgets/registry';
 import { WidgetShell } from './widgets/widget-shell';
 import { Icon, type IconName } from './ui-kit';
@@ -32,7 +37,11 @@ const tools: { name: IconName; label: string }[] = [
   { name: 'image', label: 'Media' },
   { name: 'music', label: 'Music' },
 ];
-type Props = { board: { id: string; title: string }; user: { name: string }; inviteCode: string };
+type Props = {
+  board: { id: string; title: string };
+  user: { id: string; name: string };
+  inviteCode: string;
+};
 type Item = Layer & { id: string };
 
 const HINTS: Record<string, string> = {
@@ -211,7 +220,15 @@ function Board({ board, user, inviteCode }: Props) {
   const [cam, setCam] = useState({ x: 0, y: 0, s: 1 });
   const [draft, setDraft] = useState<Layer | null>(null);
   const [pen, setPen] = useState<number[] | null>(null);
+  const [goingHome, setGoingHome] = useState(false);
+  const [titleSaved, setTitleSaved] = useState(true);
   const ref = useRef<HTMLElement>(null);
+  const isPdfOver = useCanvasPdfDrop({
+    canvasRef: ref,
+    camera: { x: cam.x, y: cam.y, scale: cam.s },
+    boardId: board.id,
+    userId: user.id,
+  });
   const g = useRef<Gesture | null>(null);
   const space = useRef(false);
 
@@ -230,10 +247,11 @@ function Board({ board, user, inviteCode }: Props) {
 
   const items: Item[] = useMemo(() => {
     return Object.entries(layers ?? {})
-      .map(([id, layer]) => ({
-        ...layer,
-        id,
-      }))
+      .map(([id, layer]) => {
+        const item = { ...layer, id } as Partial<Item> & { id: string };
+        if (item.points) item.points = [...item.points];
+        return item as Item;
+      })
       .sort((a, b) => a.createdAt - b.createdAt);
   }, [layers]);
 
@@ -299,9 +317,10 @@ function Board({ board, user, inviteCode }: Props) {
     setFocusedWidget(id);
     setTool('cursor');
   };
-  const duplicateWidget = (w: WSnap) =>
+  const duplicateWidget = (w: WSnap) => {
+    const id = nanoid();
     insertWidget(
-      nanoid(),
+      id,
       {
         widgetType: w.widgetType,
         x: w.x + 30,
@@ -316,6 +335,7 @@ function Board({ board, user, inviteCode }: Props) {
       },
       { ...w.data },
     );
+  };
 
   const insert = useMutation(({ storage }, id: string, l: Layer) => {
     storage.get('layers').set(id, new LiveObject(l));
@@ -334,13 +354,26 @@ function Board({ board, user, inviteCode }: Props) {
     if (!t) return setTitle(board.title);
     if (t !== board.title)
       startT(async () => {
-        await renameBoard(board.id, t);
+        setTitleSaved(false);
+        try {
+          await renameBoard(board.id, t);
+          setTitleSaved(true);
+        } catch {
+          setTitle(board.title);
+          setTitleSaved(true);
+          toast.error("Couldn't save the board title. Please try again.");
+        }
       });
   };
-  const share = () => {
-    navigator.clipboard?.writeText(`${location.origin}/join/${inviteCode}?board=${board.id}`);
-    setShared(true);
-    setTimeout(() => setShared(false), 2000);
+  const share = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard access is unavailable');
+      await navigator.clipboard.writeText(`${location.origin}/join/${inviteCode}?board=${board.id}`);
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    } catch {
+      toast.error("Couldn't copy the board link. Check your browser's clipboard permissions and try again.");
+    }
   };
   const pick = (t: IconName) => {
     if (t === 'music') setPlayer((p) => !p);
@@ -426,6 +459,7 @@ function Board({ board, user, inviteCode }: Props) {
       e: 'eraser',
     };
     const dn = (e: KeyboardEvent) => {
+      if (isFromWidgetBody(e)) return;
       const el = e.target as HTMLElement;
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
       if (e.code === 'Space') {
@@ -463,6 +497,7 @@ function Board({ board, user, inviteCode }: Props) {
 
   const down = (e: React.PointerEvent) => {
     if (e.button === 2) return;
+    if (isFromWidgetBody(e.nativeEvent)) return;
     ref.current!.setPointerCapture(e.pointerId);
     const p = world(e);
     if (space.current || e.button === 1) {
@@ -621,20 +656,29 @@ function Board({ board, user, inviteCode }: Props) {
   return (
     <div className={`whiteboard tool-${tool}`}>
       <header className="board-topbar">
-        <button className="board-home" onClick={() => go('dashboard')}>
+        <button
+          className="board-home"
+          onClick={() => { setGoingHome(true); router.push('/dashboard'); }}
+          disabled={goingHome}
+          title="Back to dashboard"
+        >
           <span className="logo-mark">
             <span />
           </span>
-          <Icon name="chevron" size={15} />
+          {goingHome ? (
+            <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+          ) : (
+            <Icon name="chevron" size={15} />
+          )}
         </button>
         <div className="board-title">
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => { setTitle(e.target.value); setTitleSaved(false); }}
             onBlur={saveTitle}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
           />
-          <span>Saved just now</span>
+          <span>{titleSaved ? 'Saved just now' : 'Saving…'}</span>
         </div>
         <div className="board-presence">
           <div className="mini-avatars">
@@ -648,13 +692,6 @@ function Board({ board, user, inviteCode }: Props) {
           <button className={shared ? 'shared' : ''} onClick={share}>
             <Icon name={shared ? 'check' : 'share'} size={17} />
             {shared ? 'Link copied' : 'Share'}
-          </button>
-          <button className="top-icon">
-            <Icon name="message" size={19} />
-            <i>2</i>
-          </button>
-          <button className="top-icon">
-            <Icon name="menu" size={19} />
           </button>
         </div>
       </header>
@@ -675,6 +712,18 @@ function Board({ board, user, inviteCode }: Props) {
         <button onClick={() => addWidget('youtube')} data-tip="Add YouTube">
           <Icon name="video" size={21} />
         </button>
+        <button onClick={() => addWidget('call')} data-tip="Add video call">
+          <Video size={21} aria-hidden="true" />
+        </button>
+        <button onClick={() => addWidget('notes')} data-tip="Add notes">
+          <NotebookPen size={21} aria-hidden="true" />
+        </button>
+        <AddPdfButton
+          canvasRef={ref}
+          camera={{ x: cam.x, y: cam.y, scale: cam.s }}
+          boardId={board.id}
+          userId={user.id}
+        />
         <span className="rail-divider" />
         <button
           onClick={() => pick('eraser')}
@@ -694,6 +743,27 @@ function Board({ board, user, inviteCode }: Props) {
         onPointerLeave={() => update({ cursor: null })}
         onDoubleClick={edit}
       >
+        {isPdfOver && (
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 20,
+              padding: '0.5rem 0.9rem',
+              borderRadius: 999,
+              background: 'rgba(36, 35, 31, 0.86)',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              letterSpacing: 0.2,
+              pointerEvents: 'none',
+            }}
+          >
+            Drop a PDF to add it
+          </div>
+        )}
         <svg
           style={{
             position: 'absolute',
@@ -977,11 +1047,17 @@ function Board({ board, user, inviteCode }: Props) {
               <i style={{ width: playing ? '54%' : '4%' }} />
             </div>
             <div className="player-controls">
-              <button>↶</button>
-              <button className="main-play" onClick={() => setPlaying(!playing)}>
+              <button disabled title="Audio playback is not available yet" aria-label="Previous track">↶</button>
+              <button
+                className="main-play"
+                disabled
+                title="Audio playback is not available yet"
+                aria-label="Audio playback unavailable"
+                onClick={() => setPlaying(!playing)}
+              >
                 {playing ? 'Ⅱ' : <Icon name="play" size={19} />}
               </button>
-              <button>↷</button>
+              <button disabled title="Audio playback is not available yet" aria-label="Next track">↷</button>
               <div className={`equalizer ${playing ? 'moving' : ''}`}>
                 <i />
                 <i />

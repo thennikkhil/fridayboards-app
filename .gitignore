@@ -2,4 +2,16 @@
 !.env.example
 node_modules
 .next
-tsconfig.tsbuildinfo*
+*.tsbuildinfo
+.vercel
+coverage
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+*.pem
+*.key
+*.p12
+*.pfx

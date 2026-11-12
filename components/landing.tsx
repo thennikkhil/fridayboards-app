@@ -9,7 +9,6 @@ export function Landing({ go }: { go: (page: Page) => void }) {
         <div className="nav-links">
           <a href="#features">Features</a>
           <a href="#students">For students</a>
-          <a href="#pricing">Pricing</a>
         </div>
         <div className="nav-actions">
           <button className="text-btn" onClick={() => go("auth")}>
@@ -40,7 +39,10 @@ export function Landing({ go }: { go: (page: Page) => void }) {
               <button className="coral-btn" onClick={() => go("dashboard")}>
                 Create your first board <Icon name="arrow" />
               </button>
-              <button className="watch-btn" onClick={() => go("board")}>
+              <button
+                className="watch-btn"
+                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+              >
                 <span>
                   <Icon name="play" size={17} />
                 </span>{" "}
@@ -151,7 +153,7 @@ export function Landing({ go }: { go: (page: Page) => void }) {
                 </svg>
               </div>
             </article>
-            <article className="feature-card mint">
+            <article className="feature-card mint" id="students">
               <div className="feature-icon">
                 <Icon name="share" />
               </div>
@@ -193,9 +195,6 @@ export function Landing({ go }: { go: (page: Page) => void }) {
                     <i />
                   </div>
                 </div>
-                <button>
-                  <Icon name="play" size={16} />
-                </button>
               </div>
             </article>
           </div>
@@ -211,4 +210,3 @@ export function Landing({ go }: { go: (page: Page) => void }) {
     </div>
   )
 }
-

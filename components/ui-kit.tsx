@@ -1,5 +1,7 @@
 "use client"
 import type React from "react"
+import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
 
 export type Page = "landing" | "auth" | "dashboard" | "create" | "board"
 export type IconName = "arrow" | "board" | "check" | "chevron" | "circle" | "cursor" | "eraser" | "grid" | "home" | "image" | "layers" | "link" | "menu" | "message" | "music" | "pen" | "play" | "plus" | "search" | "share" | "shapes" | "spark" | "star" | "text" | "timer" | "undo" | "video" | "zoom"
@@ -141,16 +143,26 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 }
 
 export function Logo({ light = false }: { light?: boolean }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [openingHome, setOpeningHome] = useState(false)
   return (
     <button
+      type="button"
       className={`logo ${light ? "text-cream" : ""}`}
-      onClick={() => (location.href = "/")}
+      onClick={() => {
+        if (openingHome || pathname === "/") return
+        setOpeningHome(true)
+        router.push("/")
+      }}
+      disabled={openingHome}
+      aria-label="Go to home"
+      aria-busy={openingHome}
     >
-      <span className="logo-mark">
+      {openingHome ? <span className="logo-spinner" aria-hidden="true" /> : <span className="logo-mark">
         <span />
-      </span>
+      </span>}
       <span>museboard</span>
     </button>
   )
 }
-

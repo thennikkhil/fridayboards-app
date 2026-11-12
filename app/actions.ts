@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { connectDb } from "@/lib/db"
+import { deleteBoardFiles } from "@/lib/files"
 import { Board, Favorite, Membership } from "@/lib/models"
 import { createWorkspaceFor, getWorkspaces, isMember, requireUser } from "@/lib/session"
 
@@ -54,6 +55,7 @@ export async function deleteBoard(id: string) {
   const { user, board } = await boardAccess(id)
   const ws = await Membership.findOne({ workspaceId: board.workspaceId, userId: user.id }).lean<any>()
   if (board.ownerId !== user.id && ws?.role !== "owner") throw new Error("Only the board or workspace owner can delete")
+  await deleteBoardFiles(id)
   await Promise.all([Board.deleteOne({ _id: board._id }), Favorite.deleteMany({ boardId: id })])
   revalidatePath("/dashboard")
 }
