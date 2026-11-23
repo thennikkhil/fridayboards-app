@@ -4,6 +4,7 @@ import { nanoid } from "nanoid"
 import { auth } from "./auth"
 import { connectDb } from "./db"
 import { Workspace, Membership } from "./models"
+import type { MembershipDoc, WorkspaceDoc } from "./models/types"
 
 export async function getUser() {
   const s = await auth.api.getSession({ headers: await headers() })
@@ -26,12 +27,12 @@ export async function createWorkspaceFor(userId: string, name: string) {
 /** Workspaces the user belongs to + the current one (cookie, else first). Creates a default one if none. */
 export async function getWorkspaces(user: { id: string; name: string }) {
   await connectDb()
-  let ms = await Membership.find({ userId: user.id }).lean()
+  let ms = await Membership.find({ userId: user.id }).lean<MembershipDoc[]>()
   if (!ms.length) {
     await createWorkspaceFor(user.id, `${user.name.split(" ")[0]}'s space`)
-    ms = await Membership.find({ userId: user.id }).lean()
+    ms = await Membership.find({ userId: user.id }).lean<MembershipDoc[]>()
   }
-  const list = (await Workspace.find({ _id: { $in: ms.map((m: any) => m.workspaceId) } }).sort({ createdAt: 1 }).lean()).map((w: any) => ({
+  const list = (await Workspace.find({ _id: { $in: ms.map((m) => m.workspaceId) } }).sort({ createdAt: 1 }).lean<WorkspaceDoc[]>()).map((w) => ({
     id: String(w._id), name: w.name, inviteCode: w.inviteCode as string,
   }))
   const wanted = (await cookies()).get("ws")?.value

@@ -6,6 +6,7 @@ import { Board } from "@/lib/models"
 import { isMember } from "@/lib/session"
 import { liveblocks } from "@/lib/liveblocks"
 import { colorFor } from "@/lib/colors"
+import type { BoardDoc } from "@/lib/models/types"
 
 function isValidObjectId(id: string) {
   return /^[0-9a-f]{24}$/.test(id)
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (typeof room !== "string" || !isValidObjectId(room))
     return new Response("Bad Request", { status: 400 })
   await connectDb()
-  const board = await Board.findById(room).lean<any>().catch(() => null)
+  const board = await Board.findById(room).lean<BoardDoc>().catch(() => null)
   if (!board || !(await isMember(session.user.id, board.workspaceId)))
     return new Response("Forbidden", { status: 403 })
   const s = liveblocks.prepareSession(session.user.id, {
